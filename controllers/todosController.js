@@ -3,7 +3,7 @@ const { validationResult } = require('express-validator');
 
 const getTodos = async (req, res) => {
     try {
-        const todos = await Todo.find();
+        const todos = await Todo.find().sort({ order: 1 });
         res.json({ todos });
     } catch (error) {
         console.log(error);
@@ -79,10 +79,18 @@ const reorderTodos = async (req, res) => {
         if (!todo) {
             return res.status(404).json({ msg: 'Todo not founded' })
         }
-        console.log(req.body.position);
 
-        await Todo.updateOne({ _id: req.params.id }, { $set: { $order: req.body.positon } });
-        res.json({ msg: 'Todo reordered' })
+        const condition = req.body.position < req.body.destination ? { $gte: req.body.position, $lte: req.body.destination } : { $lte: req.body.position, $gte: req.body.destination };
+
+        const updated = await Todo.updateMany({ order: condition }, { $inc: { order: req.body.position < req.body.destination ? -1 : 1 } })
+
+        if (updated.ok) {
+            todo = await Todo.findByIdAndUpdate({ _id: req.params.id }, { $set: { order: req.body.destination } }, { new: true });
+            res.json({ msg: 'Todo reordered' })
+        } else {
+            res.status(500).send('There is an error');
+        }
+
 
     } catch (error) {
         console.log(error);
