@@ -1,128 +1,135 @@
-const Todo = require('../models/Todo');
-const { validationResult } = require('express-validator');
+const Todo = require("../models/Todo");
+const { validationResult } = require("express-validator");
 
 const getTodos = async (req, res) => {
-    try {
-        const todos = await Todo.find().sort({ order: 1 });
-        res.json({ todos });
-    } catch (error) {
-        console.log(error);
-        res.status(500).send('There is an error');
-    }
-}
+  try {
+    const todos = await Todo.find().sort({ order: 1 });
+    res.json({ todos });
+  } catch (error) {
+    console.log(error);
+    res.status(500).send("There is an error");
+  }
+};
 
 const addTodo = async (req, res) => {
-    const errors = validationResult(req);
+  const errors = validationResult(req);
 
-    if (!errors.isEmpty()) {
-        return res.status(404).json({ errors: errors.array() });
+  if (!errors.isEmpty()) {
+    return res.status(404).json({ errors: errors.array() });
+  }
+
+  try {
+    const todo = new Todo(req.body);
+    let maxTodo = await Todo.find().sort({ order: -1 }).limit(1);
+
+    if (maxTodo.length) {
+      todo.order = maxTodo[0].order + 1;
     }
 
-    try {
-        const todo = new Todo(req.body);
-        let maxTodo = await Todo.find().sort({ order: -1 }).limit(1);
-
-        if (maxTodo.length) {
-            todo.order = maxTodo[0].order + 1;
-        }
-
-        await todo.save();
-        res.json(todo);
-
-    } catch (error) {
-        console.log(error);
-        res.status(500).send('There is an error');
-    }
-
-}
+    await todo.save();
+    res.json(todo);
+  } catch (error) {
+    console.log(error);
+    res.status(500).send("There is an error");
+  }
+};
 
 const updTodo = async (req, res) => {
-    try {
-        let newTodo = req.body;
-        let todo = await Todo.findById(req.params.id);
+  try {
+    let newTodo = req.body;
+    let todo = await Todo.findById(req.params.id);
 
-        if (!todo) {
-            return res.status(404).json({ msg: 'Todo not founded' })
-        }
-
-        todo = await Todo.findByIdAndUpdate({ _id: req.params.id }, { $set: newTodo }, { new: true });
-
-        return res.json({ todo });
-    } catch (error) {
-        console.log(error);
-        res.status(500).send('There is an error');
+    if (!todo) {
+      return res.status(404).json({ msg: "Todo not founded" });
     }
-}
+
+    todo = await Todo.findByIdAndUpdate(
+      { _id: req.params.id },
+      { $set: newTodo },
+      { new: true }
+    );
+
+    return res.json({ todo });
+  } catch (error) {
+    console.log(error);
+    res.status(500).send("There is an error");
+  }
+};
 
 const deleteTodo = async (req, res) => {
-    try {
-        let todo = await Todo.findById(req.params.id)
+  try {
+    let todo = await Todo.findById(req.params.id);
 
-        if (!todo) {
-            return res.status(404).json({ msg: 'Todo not founded' })
-        }
-
-        await Todo.findByIdAndDelete({ _id: req.params.id })
-
-        res.json({ msg: 'Todo deleted' })
-    } catch (error) {
-        console.log(error);
-        res.status(500).send('There is an error');
+    if (!todo) {
+      return res.status(404).json({ msg: "Todo not founded" });
     }
-}
+
+    await Todo.findByIdAndDelete({ _id: req.params.id });
+
+    res.json({ msg: "Todo deleted" });
+  } catch (error) {
+    console.log(error);
+    res.status(500).send("There is an error");
+  }
+};
 
 const reorderTodos = async (req, res) => {
+  try {
+    let todo = await Todo.findById(req.params.id);
 
-    try {
-        let todo = await Todo.findById(req.params.id)
-
-        if (!todo) {
-            return res.status(404).json({ msg: 'Todo not founded' })
-        }
-
-        const condition = req.body.position < req.body.destination ? { $gte: req.body.position, $lte: req.body.destination } : { $lte: req.body.position, $gte: req.body.destination };
-
-        const updated = await Todo.updateMany({ order: condition }, { $inc: { order: req.body.position < req.body.destination ? -1 : 1 } })
-
-        if (updated.ok) {
-            todo = await Todo.findByIdAndUpdate({ _id: req.params.id }, { $set: { order: req.body.destination } }, { new: true });
-            res.json({ msg: 'Todo reordered' })
-        } else {
-            res.status(500).send('There is an error');
-        }
-
-
-    } catch (error) {
-        console.log(error);
-        res.status(500).send('There is an error');
+    if (!todo) {
+      return res.status(404).json({ msg: "Todo not founded" });
     }
 
-}
+    const condition =
+      req.body.position < req.body.destination
+        ? { $gte: req.body.position, $lte: req.body.destination }
+        : { $lte: req.body.position, $gte: req.body.destination };
+
+    const updated = await Todo.updateMany(
+      { order: condition },
+      { $inc: { order: req.body.position < req.body.destination ? -1 : 1 } }
+    );
+
+    if (updated.ok) {
+      todo = await Todo.findByIdAndUpdate(
+        { _id: req.params.id },
+        { $set: { order: req.body.destination } },
+        { new: true }
+      );
+      res.json({ msg: "Todo reordered" });
+    } else {
+      res.status(500).send("There is an error");
+    }
+  } catch (error) {
+    console.log(error);
+    res.status(500).send("There is an error");
+  }
+};
 
 const deleteCompletedTodos = async (req, res) => {
-    try {
-        let todos = await Todo.find({ completed: true }).exec();
-        console.log(todos);
+  try {
+    let todos = await Todo.find({ completed: true }).exec();
+    console.log(todos);
 
-        if (!todos) {
-            return res.status(404).json({ msg: 'There is not completed todos' })
-        }
-
-        await Todo.deleteMany({ completed: true });
-
-        res.json({ msg: 'Todos deleted' })
-    } catch (error) {
-        console.log(error);
-        res.status(500).send('There is an error');
+    if (!todos) {
+      return res.status(404).json({ msg: "There is not completed todos" });
     }
-}
 
+    await Todo.deleteMany({ completed: true });
+
+    res.json({ msg: "Todos deleted" });
+  } catch (error) {
+    console.log(error);
+    res.status(500).send("There is an error");
+  }
+};
 
 module.exports = {
-    addTodo,
-    getTodos,
-    updTodo,
-    deleteTodo,
-    reorderTodos,
-    deleteCompletedTodos
-}
+  addTodo,
+  getTodos,
+  updTodo,
+  deleteTodo,
+  reorderTodos,
+  deleteCompletedTodos,
+};
